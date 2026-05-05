@@ -28,25 +28,29 @@ jobs:
     steps:
       # ── 1. CHECKOUT ───────────────────────────────────────────────────────
       - name: Checkout repo
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: true
 
       # ── 2. PYTHON SETUP ───────────────────────────────────────────────────
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@0b93645e9fea7318ecaed2befa3f7df41bc0ee4  # v5.3.0
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
 
       # ── 3. CACHE APT PACKAGES ─────────────────────────────────────────────
       - name: Cache apt packages
-        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf    # v4.2.0
+        id: cache-apt
+        uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
           key: apt-manim-ubuntu22-v1
 
+      # ── 4. INSTALL DEPENDENCIES ───────────────────────────────────────────
       - name: Install system dependencies
+        if: steps.cache-apt.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
@@ -59,14 +63,6 @@ jobs:
             python3-dev \
             libgirepository1.0-dev \
             gir1.2-pango-1.0
-
-      # ── 4. CACHE PIP PACKAGES ─────────────────────────────────────────────
-      - name: Cache pip packages
-        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf    # v4.2.0
-        with:
-          path: ~/.cache/pip
-          key: pip-manim-${{ hashFiles('requirements.txt') }}
-          restore-keys: pip-manim-
 
       - name: Install Python dependencies
         run: pip install --upgrade pip --quiet && pip install -r requirements.txt --quiet
@@ -205,17 +201,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="reel-$(date +%Y%m%d-%H%M%S)"
+
+          # Create the release and upload the video asset
           gh release create "$TAG" shloka_video.mp4 \
             --title "Reel $TAG" \
             --notes "Auto-generated daily Gita reel" \
             --repo ${{ github.repository }}
-          echo "VIDEO_URL=https://github.com/${{ github.repository }}/releases/download/${TAG}/shloka_video.mp4" >> $GITHUB_ENV
+
+          # Get the direct CDN URL — Meta API does NOT follow GitHub's redirect
+          # gh gives us the resolved objects.githubusercontent.com URL directly
+          ASSET_URL=$(gh release view "$TAG" \
+            --repo ${{ github.repository }} \
+            --json assets \
+            --jq '.assets[0].browserDownloadUrl')
+
+          echo "VIDEO_URL=${ASSET_URL}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
+          echo "✅ Video hosted at: ${ASSET_URL}"
 
       # ── 10. POST TO INSTAGRAM ─────────────────────────────────────────────
       - name: Post reel to Instagram
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ env.IG_ACCESS_TOKEN }}
           VIDEO_URL:  ${{ env.VIDEO_URL }}
         run: python upload.py
 
