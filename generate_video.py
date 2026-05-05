@@ -44,7 +44,7 @@ SAFFRON = "#E05C0A"   # deep saffron    (headers, CTA)
 MUTED   = "#7A8298"   # slate grey      (secondary, watermark)
 DIVCLR  = "#B09040"   # mid-warm gold   (dividers)
 
-FONT     = "Segoe UI"            # widely installed on Windows, clean
+FONT     = "Noto Sans"           # available on Ubuntu (fonts-noto-core) and Windows
 FONT_DEV = "Noto Sans Devanagari"  # confirmed present
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
