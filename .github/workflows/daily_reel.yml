@@ -216,12 +216,28 @@ jobs:
             --notes "Auto-generated daily Gita reel" \
             --repo ${{ github.repository }}
 
-          # Get the direct CDN URL — Meta API does NOT follow GitHub's redirect
-          # gh gives us the resolved objects.githubusercontent.com URL directly
-          ASSET_URL=$(gh release view "$TAG" \
-            --repo ${{ github.repository }} \
-            --json assets \
-            --jq '.assets[0].browserDownloadUrl')
+          # Wait for GitHub to process the asset — retry up to 10 times (30s max)
+          ASSET_URL=""
+          for i in $(seq 1 10); do
+            ASSET_URL=$(gh release view "$TAG" \
+              --repo ${{ github.repository }} \
+              --json assets \
+              --jq '.assets[0].browserDownloadUrl // empty')
+
+            if [ -n "$ASSET_URL" ]; then
+              echo "✅ Asset ready on attempt ${i}: ${ASSET_URL}"
+              break
+            fi
+
+            echo "⏳ Attempt ${i}/10 — asset not ready yet, waiting 3s..."
+            sleep 3
+          done
+
+          # Fail fast if URL is still empty after all retries
+          if [ -z "$ASSET_URL" ]; then
+            echo "::error::GitHub asset URL never became available after 30s"
+            exit 1
+          fi
 
           echo "VIDEO_URL=${ASSET_URL}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
