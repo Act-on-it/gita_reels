@@ -57,7 +57,6 @@ jobs:
             libcairo2-dev \
             libpango1.0-dev \
             fonts-noto-core \
-            fonts-noto-extra \
             pkg-config \
             python3-dev \
             libgirepository1.0-dev \
@@ -68,7 +67,7 @@ jobs:
         run: |
           sudo dpkg -i /var/cache/apt/archives/*.deb 2>/dev/null || \
           sudo apt-get install -y --no-install-recommends -o Dir::Cache::Archives=/var/cache/apt/archives \
-            ffmpeg libcairo2-dev libpango1.0-dev fonts-noto-core fonts-noto-extra \
+            ffmpeg libcairo2-dev libpango1.0-dev fonts-noto-core \
             pkg-config python3-dev libgirepository1.0-dev gir1.2-pango-1.0
 
       # ── 4. INSTALL PYTHON DEPENDENCIES ─────────────────────────────────
