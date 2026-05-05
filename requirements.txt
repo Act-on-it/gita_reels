@@ -1,2 +1,4 @@
-manim
-requests
+manim==0.20.1
+requests==2.33.1
+pynacl==1.6.2
+cryptography>=42.0.0,<44.0.0
