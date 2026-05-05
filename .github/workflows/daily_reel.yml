@@ -186,7 +186,22 @@ jobs:
       - name: Generate shloka video
         run: python generate_video.py
 
-      # ── 8. VERIFY VIDEO OUTPUT ────────────────────────────────────────────
+      # ── 8. MIX AUDIO INTO VIDEO ──────────────────────────────────────────
+      - name: Add background audio to video
+        run: |
+          ffmpeg -i shloka_video.mp4 \
+                -i assets/background.mp3 \
+                -filter_complex "[1:a]volume=0.4,aloop=loop=-1:size=2e+09[bg];[bg]atrim=duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 shloka_video.mp4)[a]" \
+                -map 0:v \
+                -map "[a]" \
+                -c:v copy \
+                -c:a aac \
+                -shortest \
+                -y shloka_video_audio.mp4
+          mv shloka_video_audio.mp4 shloka_video.mp4
+          echo "✅ Audio mixed into video"
+
+      # ── 9. VERIFY VIDEO OUTPUT ────────────────────────────────────────────
       - name: Verify video was created correctly
         run: |
           if [ ! -f "shloka_video.mp4" ]; then
@@ -201,7 +216,7 @@ jobs:
           fi
           echo "✅ Video OK (${SIZE} bytes)"
 
-      # ── 9. HOST VIDEO VIA GITHUB RELEASE ──────────────────────────────────
+      # ── 10. HOST VIDEO VIA GITHUB RELEASE ──────────────────────────────────
       - name: Upload video to GitHub Release (public URL for Meta API)
         id: upload_video
         env:
@@ -244,7 +259,7 @@ jobs:
           echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
           echo "✅ Video hosted at: ${ASSET_URL}"
 
-      # ── 10. POST TO INSTAGRAM ─────────────────────────────────────────────
+      # ── 11. POST TO INSTAGRAM ─────────────────────────────────────────────
       - name: Post reel to Instagram
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
@@ -252,31 +267,39 @@ jobs:
           VIDEO_URL:  ${{ env.VIDEO_URL }}
         run: python upload.py
 
-      # ── 11. CLEAN UP OLD RELEASES ─────────────────────────────────────────
+      # ── 12. CLEAN UP OLD RELEASES ─────────────────────────────────────────
       # Keeps only the last 10 releases to avoid GitHub storage bloat
       - name: Clean up old GitHub Releases
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release list \
+          # Get all release tags sorted oldest-first, skip the 10 newest
+          TAGS_TO_DELETE=$(gh release list \
             --repo ${{ github.repository }} \
             --limit 100 \
             --json tagName,createdAt \
-          | python3 - <<'EOF'
-          import json, sys, subprocess
-          releases = json.load(sys.stdin)
-          releases.sort(key=lambda r: r["createdAt"])
-          to_delete = releases[:-10]
-          for r in to_delete:
-              subprocess.run(
-                  ["gh", "release", "delete", r["tagName"], "--yes", "--cleanup-tag"],
-                  check=False
-              )
-          print(f"✅ Kept {min(10, len(releases))}, deleted {len(to_delete)} old releases")
-          EOF
+            --jq 'sort_by(.createdAt) | .[:-10] | .[].tagName' \
+            2>/dev/null || echo "")
 
-      # ── 12. COMMIT PROGRESS ───────────────────────────────────────────────
+          if [ -z "$TAGS_TO_DELETE" ]; then
+            echo "✅ Nothing to clean up (≤10 releases exist)"
+            exit 0
+          fi
+
+          COUNT=0
+          while IFS= read -r TAG; do
+            echo "🗑️  Deleting release: ${TAG}"
+            gh release delete "$TAG" \
+              --repo ${{ github.repository }} \
+              --yes \
+              --cleanup-tag 2>/dev/null || echo "⚠️ Could not delete ${TAG}, skipping"
+            COUNT=$((COUNT + 1))
+          done <<< "$TAGS_TO_DELETE"
+
+          echo "✅ Deleted ${COUNT} old release(s)"
+
+      # ── 13. COMMIT PROGRESS ───────────────────────────────────────────────
       - name: Commit updated progress.json
         if: success()
         run: |
@@ -288,7 +311,7 @@ jobs:
             git commit -m "chore: shloka #${SHLOKA_IDX} posted [skip ci]"
           git push
 
-      # ── 13. FAILURE SUMMARY ───────────────────────────────────────────────
+      # ── 14. FAILURE SUMMARY ───────────────────────────────────────────────
       - name: Print failure summary
         if: failure()
         run: |
