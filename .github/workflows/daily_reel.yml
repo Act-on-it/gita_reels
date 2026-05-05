@@ -216,28 +216,30 @@ jobs:
             --notes "Auto-generated daily Gita reel" \
             --repo ${{ github.repository }}
 
-          # Wait for GitHub to process the asset — retry up to 10 times (30s max)
-          ASSET_URL=""
-          for i in $(seq 1 10); do
-            ASSET_URL=$(gh release view "$TAG" \
-              --repo ${{ github.repository }} \
-              --json assets \
-              --jq '.assets[0].browserDownloadUrl // empty')
+          # Construct URL directly — no API query needed, pattern is always the same
+          ASSET_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/shloka_video.mp4"
 
-            if [ -n "$ASSET_URL" ]; then
-              echo "✅ Asset ready on attempt ${i}: ${ASSET_URL}"
+          # Verify the URL is actually reachable before passing it downstream
+          echo "⏳ Verifying asset is reachable..."
+          for i in $(seq 1 10); do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -L \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "${ASSET_URL}")
+
+            if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "302" ]; then
+              echo "✅ Asset reachable (HTTP ${HTTP_STATUS}) on attempt ${i}"
               break
             fi
 
-            echo "⏳ Attempt ${i}/10 — asset not ready yet, waiting 3s..."
+            echo "⏳ Attempt ${i}/10 — HTTP ${HTTP_STATUS}, waiting 3s..."
             sleep 3
-          done
 
-          # Fail fast if URL is still empty after all retries
-          if [ -z "$ASSET_URL" ]; then
-            echo "::error::GitHub asset URL never became available after 30s"
-            exit 1
-          fi
+            if [ "$i" = "10" ]; then
+              echo "::error::Asset URL not reachable after 30s (last status: ${HTTP_STATUS})"
+              exit 1
+            fi
+          done
 
           echo "VIDEO_URL=${ASSET_URL}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
