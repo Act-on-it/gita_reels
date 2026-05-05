@@ -27,8 +27,9 @@ def build_caption(s):
     )
     return (
         f"📖 Bhagavad Gita — Chapter {s['chapter']}, Verse {s['verse']}\n\n"
-        f"{s['translation'].replace(chr(10), ' ')}\n\n"
-        f"💡 {s['explanation'].replace(chr(10), ' ')}\n\n"
+        f"🕉️ {s['sanskrit'].replace(chr(10), ' ')}\n\n" # Sanskrit with line breaks replaced by spaces
+        f"{s['translation'].replace(chr(10), ' ')}\n\n" # English translation with line breaks replaced by spaces
+        f"💡 {s['explanation'].replace(chr(10), ' ')}\n\n" # English explanation with line breaks replaced by spaces
         f"Download Gita Guru — Free on Play Store 🙏\n\n"
         f"{hashtags}"
     )
