@@ -31,8 +31,8 @@ FH    = 25.284   # frame height in units  (= FW * 1920/1080)
 PPU   = 75.9     # pixels per unit
 
 # Key y positions (all within safe zone)
-HUD_TOP_Y   =  10.5    # brand bar  (~8% from top)
-HUD_BOT_Y   =  -9.0    # watermark  (~87% from top)
+HUD_TOP_Y   =  9.5    # brand bar  (~8% from top)
+HUD_BOT_Y   =  -8.5    # watermark  (~87% from top)
 
 # ── Colour palette ─────────────────────────────────────────────────────────────
 BG      = "#08060D"   # near-black with warm maroon undertone
@@ -198,7 +198,7 @@ def build_s4() -> tuple:
     btn_bg  = RoundedRectangle(corner_radius=0.60, width=12.5, height=2.0,
                                fill_color=SAFFRON, fill_opacity=1.0, stroke_width=0)
     btn_lbl = Text("Download Free — Google Play",
-                   font=FONT, font_size=32, color=WHITE, weight=BOLD)
+                   font=FONT, font_size=36, color=WHITE, weight=BOLD)
     btn_lbl.move_to(btn_bg.get_center())
     btn = VGroup(btn_bg, btn_lbl)
 

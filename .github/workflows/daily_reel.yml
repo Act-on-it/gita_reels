@@ -1,0 +1,59 @@
+name: Daily Gita Reel
+
+on:
+  schedule:
+    - cron: '30 1 * * *'   # 7:00 AM IST daily
+  workflow_dispatch:
+
+jobs:
+  post-reel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev \
+            fonts-noto fonts-noto-cjk pkg-config python3-dev
+
+      - name: Install Python dependencies
+        run: pip install manim requests
+
+      - name: Generate video
+        run: python generate_video.py
+
+      - name: Upload video to GitHub Release (public URL)
+        id: upload_video
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="reel-$(date +%Y%m%d-%H%M%S)"
+          gh release create "$TAG" shloka_video.mp4 \
+            --title "Daily Reel $TAG" \
+            --notes "Auto-generated daily reel" \
+            --repo ${{ github.repository }}
+          VIDEO_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/shloka_video.mp4"
+          echo "VIDEO_URL=$VIDEO_URL" >> $GITHUB_ENV
+
+      - name: Post to Instagram
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID:      ${{ secrets.IG_USER_ID }}
+          VIDEO_URL:       ${{ env.VIDEO_URL }}
+        run: python upload.py
+
+      - name: Commit updated progress.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add progress.json
+          git commit -m "chore: increment shloka index [skip ci]"
+          git push
