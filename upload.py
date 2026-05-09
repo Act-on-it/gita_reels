@@ -6,10 +6,12 @@ No third-party service needed.
 
 import os, json, time, requests
 
-ACCESS_TOKEN     = os.environ["IG_ACCESS_TOKEN"]
-IG_USER_ID       = os.environ["IG_USER_ID"]
-VIDEO_URL        = os.environ["VIDEO_URL"]   # public URL to the uploaded video
-GRAPH_URL        = f"https://graph.instagram.com/v21.0/{IG_USER_ID}"
+ACCESS_TOKEN = os.environ["IG_ACCESS_TOKEN"]
+IG_USER_ID = os.environ["IG_USER_ID"]
+VIDEO_URL = os.environ["VIDEO_URL"]  # public URL to the uploaded video
+COVER_URL = os.environ.get("COVER_URL", "")  # optional public URL to cover PNG
+GRAPH_URL = f"https://graph.instagram.com/v21.0/{IG_USER_ID}"
+
 
 def get_current_shloka():
     with open("progress.json") as f:
@@ -18,31 +20,38 @@ def get_current_shloka():
         shlokas = json.load(f)
     return shlokas[idx]
 
+
 def build_caption(s):
     hashtags = (
-        "#BhagavadGita #GeetaQuotes #SanatanDharma #HinduWisdom "
-        "#DailyGita #GitaGuru #VedicWisdom #Spirituality #Krishna "
-        "#GitaShloka #BhagavadGitaQuotes #Hinduism #DailyWisdom "
-        "#AncientWisdom #InnerPeace"
+        "#BhagavadGita #BhagavadGitaQuotes #GeetaQuotes #GitaShloka "
+        "#gitashlok #BhagwadGeeta #GitaTeachings #gitawisdom "
+        "#SanatanDharma #HinduWisdom #VedicWisdom #KrishnaConsciousness "
+        "#krishnaquotes #HareKrishna #JaiShreeKrishna #Bhakti "
+        "#ShriKrishna #GitaGuru #gitaguruapp #dailyshloka"
     )
     return (
         f"📖 Bhagavad Gita — Chapter {s['chapter']}, Verse {s['verse']}\n\n"
-        f"🕉️ {s['sanskrit'].replace(chr(10), ' ')}\n\n" # Sanskrit with line breaks replaced by spaces
-        f"{s['translation'].replace(chr(10), ' ')}\n\n" # English translation with line breaks replaced by spaces
-        f"💡 {s['explanation'].replace(chr(10), ' ')}\n\n" # English explanation with line breaks replaced by spaces
+        f"🕉️ {s['sanskrit'].replace(chr(10), ' ')}\n\n"  # Sanskrit with line breaks replaced by spaces
+        f"{s['translation'].replace(chr(10), ' ')}\n\n"  # English translation with line breaks replaced by spaces
+        f"💡 {s['explanation'].replace(chr(10), ' ')}\n\n"  # English explanation with line breaks replaced by spaces
         f"Download Gita Guru — Free on Play Store 🙏\n\n"
         f"{hashtags}"
     )
+
 
 def post_reel(caption: str):
     # Step 1 — Create media container
     print("Creating media container...")
     payload = {
-        "media_type":   "REELS",
-        "video_url":    VIDEO_URL,
-        "caption":      caption,
+        "media_type": "REELS",
+        "video_url": VIDEO_URL,
+        "caption": caption,
         "access_token": ACCESS_TOKEN,
+        "share_to_feed": "true",
     }
+    if COVER_URL:
+        payload["cover_url"] = COVER_URL
+        print(f"  Using custom cover: {COVER_URL}")
     resp = requests.post(f"{GRAPH_URL}/media", data=payload)
 
     # ── Print full error details before raising ──
@@ -52,8 +61,12 @@ def post_reel(caption: str):
             err = resp.json()
             print(f"   Error type    : {err.get('error', {}).get('type', 'unknown')}")
             print(f"   Error code    : {err.get('error', {}).get('code', 'unknown')}")
-            print(f"   Error subcode : {err.get('error', {}).get('error_subcode', 'unknown')}")
-            print(f"   Message       : {err.get('error', {}).get('message', 'unknown')}")
+            print(
+                f"   Error subcode : {err.get('error', {}).get('error_subcode', 'unknown')}"
+            )
+            print(
+                f"   Message       : {err.get('error', {}).get('message', 'unknown')}"
+            )
             print(f"   Full response : {json.dumps(err, indent=2)}")
         except Exception:
             print(f"   Raw response  : {resp.text}")
@@ -68,7 +81,7 @@ def post_reel(caption: str):
         time.sleep(20)
         status_resp = requests.get(
             f"https://graph.instagram.com/v21.0/{container_id}",
-            params={"fields": "status_code", "access_token": ACCESS_TOKEN}
+            params={"fields": "status_code", "access_token": ACCESS_TOKEN},
         )
         status = status_resp.json().get("status_code", "")
         print(f"  Attempt {attempt+1}: status = {status}")
@@ -84,9 +97,9 @@ def post_reel(caption: str):
     pub_resp = requests.post(
         f"{GRAPH_URL}/media_publish",
         data={
-            "creation_id":  container_id,
+            "creation_id": container_id,
             "access_token": ACCESS_TOKEN,
-        }
+        },
     )
     if not pub_resp.ok:
         print(f"\n❌ Publish error: {pub_resp.text}")
@@ -101,7 +114,10 @@ def verify_credentials():
     print("🔍 Verifying credentials...")
     r = requests.get(
         f"https://graph.instagram.com/v21.0/{IG_USER_ID}",
-        params={"fields": "id,name,username,account_type", "access_token": ACCESS_TOKEN}
+        params={
+            "fields": "id,name,username,account_type",
+            "access_token": ACCESS_TOKEN,
+        },
     )
     if not r.ok:
         print(f"❌ Credential check failed: {r.json()}")
@@ -127,7 +143,7 @@ def verify_credentials():
 
 if __name__ == "__main__":
     verify_credentials()
-    shloka  = get_current_shloka()
+    shloka = get_current_shloka()
     caption = build_caption(shloka)
     print(f"\n📤 Posting BG {shloka['chapter']}.{shloka['verse']}...")
     post_reel(caption)
